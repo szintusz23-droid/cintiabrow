@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111111">
+<title>Brow Studio - szemöldök tervező</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #0d0d0f; color: #eee; font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; overflow: hidden; overscroll-behavior: none; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; -webkit-user-select: none; user-select: none; }
+
+  #bar { position: fixed; left: 0; right: 0; top: 0; background: linear-gradient(rgba(0,0,0,.85), rgba(0,0,0,.6)); padding: calc(6px + env(safe-area-inset-top)) 6px 6px; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; z-index: 5; }
+  button { background: #26262b; color: #fff; border: 1px solid #3c3c44; border-radius: 10px; padding: 7px 9px; font-size: 13px; font-family: inherit; }
+  button.on { background: #b03a6e; border-color: #d4558b; }
+  button:active { transform: scale(.96); }
+
+  #pose { position: fixed; left: 8px; top: 108px; padding: 5px 10px; border-radius: 12px; font-size: 13px; z-index: 5; pointer-events: none; display: none; }
+  #pose.ok { background: rgba(20,140,80,.85); }
+  #pose.warn { background: rgba(200,110,20,.9); }
+  #status { position: fixed; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 6px 12px; border-radius: 14px; font-size: 13px; z-index: 5; text-align: center; max-width: 80%; pointer-events: none; display: none; }
+
+  #info { position: fixed; left: 8px; bottom: calc(84px + env(safe-area-inset-bottom)); background: rgba(0,0,0,.72); border: 1px solid #333; border-radius: 12px; padding: 7px 9px; font-size: 11.5px; line-height: 1.45; z-index: 5; pointer-events: none; display: none; }
+  #info b { color: #ff7fb8; font-weight: 600; }
+  #info .muted { color: #999; font-size: 10.5px; }
+
+  #panel { position: fixed; right: 8px; top: 104px; max-height: calc(100% - 200px); overflow-y: auto; background: rgba(12,12,14,.94); border: 1px solid #3c3c44; border-radius: 14px; padding: 10px 12px; font-size: 14px; z-index: 6; display: none; width: 268px; }
+  #panel label { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+  #panel input[type=range] { flex: 1; accent-color: #d4558b; }
+  #panel input[type=checkbox] { accent-color: #d4558b; width: 18px; height: 18px; }
+  #panel h4 { font-size: 12px; letter-spacing: .5px; text-transform: uppercase; color: #e58ab3; margin: 12px 0 4px; }
+  #panel .row { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0; }
+  #panel .row button { font-size: 12.5px; padding: 6px 8px; }
+  #panel p { font-size: 12px; color: #aaa; line-height: 1.4; }
+
+  #toast { position: fixed; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(176,58,110,.95); padding: 8px 14px; border-radius: 14px; font-size: 14px; z-index: 9; display: none; }
+
+  #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 10; background: radial-gradient(circle at 50% 30%, #2a1420, #0d0d0f 70%); padding: 24px; text-align: center; }
+  #start h1 { font-size: 30px; font-weight: 700; letter-spacing: .5px; }
+  #start h1 span { color: #ff6fae; }
+  #start button { font-size: 18px; padding: 14px 30px; background: #b03a6e; border: none; border-radius: 14px; }
+  #start ul { color: #bbb; max-width: 340px; line-height: 1.6; font-size: 14.5px; text-align: left; padding-left: 18px; }
+</style>
+</head>
+<body>
+
+<div id="start">
+  <h1>Brow <span>Studio</span></h1>
+  <ul>
+    <li>Jó fény kell. A fej dőlhet, a vonalak követik.</li>
+    <li>A fehér karikákat ujjal húzhatod, a forma követi őket.</li>
+    <li>A zöld, sárga és piros vonalat fel-le húzhatod.</li>
+    <li>Nem kell a karikára tenni az ujjad, elég mellette húzni.</li>
+  </ul>
+  <button id="go">Kamera indítása</button>
+</div>
+
+<canvas id="cv"></canvas>
+<div id="status"></div>
+<div id="pose"></div>
+<div id="info"></div>
+<div id="toast"></div>
+
+<div id="bar">
+  <button id="bZoom" class="on">Zoom</button>
+  <button id="bShape" class="on">Forma</button>
+  <button id="bLines" class="on">Vonalak</button>
+  <button id="bDots" class="on">Pontok</button>
+  <button id="bMeas">Mérés</button>
+  <button id="bFreeze">Megállít</button>
+  <button id="bReset">Alaphelyzet</button>
+  <button id="bSave">Fotó</button>
+  <button id="bFlip">Kamera</button>
+  <button id="bMirror" class="on">Tükör</button>
+  <button id="bSet">Beállítás</button>
+</div>
+
+<div id="panel">
+  <h4>Forma</h4>
+  <label><input type="checkbox" id="sSym" checked> Két oldal együtt mozog</label>
+  <label>Eleje kerekítés <input type="range" id="sRound" min="0" max="100" value="35"></label>
+  <label><input type="checkbox" id="sFill" checked> Kitöltés</label>
+  <label>Körvonal színe <input type="color" id="shapeCol" value="#111111"></label>
+  <label>Kitöltés színe <input type="color" id="fillCol" value="#6b4a35"></label>
+  <label>Körvonal vastagság <input type="range" id="shapeW" min="0.5" max="4" step="0.5" value="1"></label>
+  <div class="row">
+    <button id="bStore">Forma mentése</button>
+    <button id="bLoad">Mentett betöltése</button>
+  </div>
+
+  <h4>Zoom</h4>
+  <label>Nagyítás <input type="range" id="zoomLvl" min="50" max="250" value="100"></label>
+
+  <h4>Vonalak</h4>
+  <label><input type="checkbox" id="lMid" checked> Középvonal (piros)</label>
+  <label><input type="checkbox" id="lMap" checked> Szemöldök vonalak (orrtól)</label>
+  <label><input type="checkbox" id="lLevel" checked> Szintvonalak</label>
+  <label><input type="checkbox" id="lBrow"> Mostani szemöldök</label>
+  <label>Ív vonal: <select id="archMode" style="flex:1;font-size:14px">
+    <option value="pupil">pupilla közepén át</option>
+    <option value="iris">írisz külső szélén át</option>
+  </select></label>
+  <label>Vonal vastagság <input type="range" id="wid" min="0.5" max="4" step="0.5" value="1"></label>
+  <p>Zöld: ív teteje. Sárga: eleje teteje és ív alja. Piros: eleje alja.</p>
+
+  <h4>Kamera</h4>
+  <label><input type="checkbox" id="poseWarn" checked> Szóljon, ha erősen oldalra fordul</label>
+  <label>Nyugalom <input type="range" id="smo" min="0" max="95" value="70"></label>
+</div>
+
+<video id="vid" playsinline muted autoplay style="display:none"></video>
+
+<script type="module">
+import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const $ = id => document.getElementById(id);
+const vid = $("vid"), cv = $("cv"), ctx = cv.getContext("2d");
+const dpr = Math.min(window.devicePixelRatio || 1, 3);
+
+let landmarker = null, stream = null, facing = "user", frozen = false, mirror = true;
+let showShape = true, showLines = true, showDots = true, showMeas = false, zoomOn = true;
+let smooth = null, lastPts = null, lastTime = -1;
+const frozenCv = document.createElement("canvas");
+
+const status = t => { $("status").textContent = t; $("status").style.display = t ? "block" : "none"; };
+let toastTimer;
+const toast = t => { const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.style.display = "none", 1800); };
+
+function resize() { cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); }
+addEventListener("resize", resize); resize();
+
+// ---------- camera and model ----------
+async function loadModel() {
+  status("Arcfelismerő betöltése...");
+  const files = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const opts = d => ({
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: d },
+    runningMode: "VIDEO", numFaces: 1,
+    minFaceDetectionConfidence: 0.4, minFacePresenceConfidence: 0.4, minTrackingConfidence: 0.4
+  });
+  try { landmarker = await FaceLandmarker.createFromOptions(files, opts("GPU")); }
+  catch { landmarker = await FaceLandmarker.createFromOptions(files, opts("CPU")); }
+}
+
+async function startCam() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  const tries = [
+    { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
+    { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+    { facingMode: facing }
+  ];
+  let err;
+  for (const v of tries) {
+    try { stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: false }); break; }
+    catch (e) { err = e; stream = null; }
+  }
+  if (!stream) throw err;
+  vid.srcObject = stream;
+  await vid.play();
+  smooth = null; lastPts = null; view.init = false;
+}
+
+$("go").onclick = async () => {
+  $("start").style.display = "none";
+  try {
+    await startCam();
+    requestAnimationFrame(loop);
+    await loadModel();
+    status("");
+  } catch (e) {
+    status("Hiba: " + (e.message || e) + ". Engedélyezd a kamerát a beállításokban.");
+  }
+};
+
+// ---------- landmark indices (A = person's right, B = person's left) ----------
+const IDX = {
+  top: 10, chin: 152, glabella: 168, noseTip: 1,
+  noseA: 129, noseB: 358,
+  eyeInA: 133, eyeInB: 362,
+  eyeOutA: 33, eyeOutB: 263,
+  irisA: 468, irisB: 473,
+  irisEdgeA: [469, 471], irisEdgeB: [474, 476],
+  browUpA: [70, 63, 105, 66, 107], browLoA: [46, 53, 52, 65, 55],
+  browUpB: [300, 293, 334, 296, 336], browLoB: [276, 283, 282, 295, 285]
+};
+
+// ---------- vector helpers ----------
+const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+const mul = (a, k) => ({ x: a.x * k, y: a.y * k });
+const dot = (a, b) => a.x * b.x + a.y * b.y;
+const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const norm = a => { const l = Math.hypot(a.x, a.y) || 1; return { x: a.x / l, y: a.y / l }; };
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+
+function getPts(lm, vw, vh) {
+  const raw = lm.map(p => ({ x: p.x * vw, y: p.y * vh }));
+  if (!smooth || smooth.length !== raw.length) { smooth = raw.map(p => ({ ...p })); return smooth; }
+  const faceH = dist(raw[IDX.top], raw[IDX.chin]) || 1;
+  const keys = [IDX.glabella, IDX.noseTip, IDX.eyeOutA, IDX.eyeOutB, IDX.top];
+  const speed = keys.reduce((s, i) => s + dist(raw[i], smooth[i]), 0) / keys.length / faceH;
+  const base = $("smo").value / 100;
+  const a = base * (1 - clamp((speed - 0.004) * 25, 0, 1));
+  for (let i = 0; i < raw.length; i++) {
+    smooth[i].x = smooth[i].x * a + raw[i].x * (1 - a);
+    smooth[i].y = smooth[i].y * a + raw[i].y * (1 - a);
+  }
+  return smooth;
+}
+
+// ---------- view (zoom / pan / mirror) ----------
+const view = { cx: 0, cy: 0, s: 1, init: false };
+const srcSize = () => frozen ? { w: frozenCv.width, h: frozenCv.height } : { w: vid.videoWidth, h: vid.videoHeight };
+function updateView() {
+  const { w, h } = srcSize(); if (!w) return;
+  const W = cv.width, H = cv.height;
+  const fit = Math.max(W / w, H / h);
+  let tx = w / 2, ty = h / 2, ts = fit;
+  if (zoomOn && lastPts) {
+    const P = lastPts;
+    const browC = lerp(P[IDX.browUpA[2]], P[IDX.browUpB[2]], 0.5);
+    const eyeC = lerp(P[IDX.irisA], P[IDX.irisB], 0.5);
+    const c = lerp(browC, eyeC, 0.3);
+    const span = dist(P[IDX.eyeOutA], P[IDX.eyeOutB]) * 1.75;
+    tx = c.x; ty = c.y;
+    ts = clamp((W * 0.96 / span) * (+$("zoomLvl").value / 100), fit * 0.6, fit * 20);
+  }
+  if (!view.init) { view.cx = tx; view.cy = ty; view.s = ts; view.init = true; }
+  const k = drag ? 0.03 : 0.18;
+  view.cx += (tx - view.cx) * k; view.cy += (ty - view.cy) * k; view.s += (ts - view.s) * k;
+}
+const sx = () => mirror ? -view.s : view.s;
+const T = p => ({ x: cv.width / 2 + (p.x - view.cx) * sx(), y: cv.height / 2 + (p.y - view.cy) * view.s });
+const Tinv = q => ({ x: view.cx + (q.x - cv.width / 2) / sx(), y: view.cy + (q.y - cv.height / 2) / view.s });
+
+function lineS(a, b) { const A = T(a), B = T(b); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke(); }
+function dotS(p, r) { ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill(); }
+function ringS(p, r, w, color) {
+  ctx.lineWidth = w + 2 * dpr; ctx.strokeStyle = "rgba(0,0,0,.55)";
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = w; ctx.strokeStyle = color;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+}
+
+// ---------- editable state ----------
+// handles per side: 0 head bottom, 1 head top, 2 arch top, 3 tail, 4 arch bottom
+const NPTS = 5;
+const zeroOffsets = () => [0, 1].map(() => Array.from({ length: NPTS }, () => ({ a: 0, b: 0 })));
+let offsets = zeroOffsets();
+// level line shifts (face units): top = green, mid = yellow, bot = red
+let levelOff = { top: 0, mid: 0, bot: 0 };
+let frame = null;      // geometry of the last drawn frame, used for dragging
+let meas = null;
+
+const LEVEL_COL = { top: "#3ddc4a", mid: "#ffd92e", bot: "#ff3b3b" };
+
+function drawOverlay(P) {
+  const lw = +$("wid").value * dpr;
+  const up = norm(sub(P[IDX.top], P[IDX.chin]));
+  const right = { x: -up.y, y: up.x };
+  const faceH = dist(P[IDX.top], P[IDX.chin]);
+  const g = P[IDX.glabella];
+  const h = p => dot(sub(p, g), up);
+  const atH = (hh) => add(g, mul(up, hh));
+
+  const sides = [
+    { nose: P[IDX.noseA], eyeIn: P[IDX.eyeInA], iris: P[IDX.irisA], irisEdge: IDX.irisEdgeA.map(i => P[i]), eyeOut: P[IDX.eyeOutA], up: IDX.browUpA.map(i => P[i]), lo: IDX.browLoA.map(i => P[i]) },
+    { nose: P[IDX.noseB], eyeIn: P[IDX.eyeInB], iris: P[IDX.irisB], irisEdge: IDX.irisEdgeB.map(i => P[i]), eyeOut: P[IDX.eyeOutB], up: IDX.browUpB.map(i => P[i]), lo: IDX.browLoB.map(i => P[i]) }
+  ];
+  // iris index order differs between model versions: pair each iris with its own eye
+  if (dist(sides[0].iris, sides[1].eyeOut) < dist(sides[0].iris, sides[0].eyeOut)) {
+    [sides[0].iris, sides[1].iris] = [sides[1].iris, sides[0].iris];
+    [sides[0].irisEdge, sides[1].irisEdge] = [sides[1].irisEdge, sides[0].irisEdge];
+  }
+
+  // three levels, from the current brows, shifted by finger
+  const topH0 = Math.max(...sides.flatMap(s => s.up).map(h));
+  const botH0 = (h(sides[0].lo[4]) + h(sides[1].lo[4])) / 2;
+  const L = {
+    top: topH0 + levelOff.top * faceH,
+    bot: botH0 + levelOff.bot * faceH
+  };
+  L.mid = (topH0 + botH0) / 2 + levelOff.mid * faceH;
+  const halfW = faceH * 0.5;
+
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+
+  // center line
+  if (showLines && $("lMid").checked) {
+    ctx.strokeStyle = "#ff3b3b"; ctx.lineWidth = lw; ctx.setLineDash([6 * dpr, 4 * dpr]);
+    lineS(atH(L.top + faceH * 0.12), P[IDX.noseTip]);
+    ctx.setLineDash([]);
+  }
+  // level lines
+  if (showLines && $("lLevel").checked) {
+    ctx.lineWidth = lw; ctx.setLineDash([8 * dpr, 5 * dpr]);
+    for (const k of ["top", "mid", "bot"]) {
+      ctx.strokeStyle = LEVEL_COL[k];
+      const c = atH(L[k]);
+      lineS(add(c, mul(right, -halfW)), add(c, mul(right, halfW)));
+    }
+    ctx.setLineDash([]);
+  }
+
+  const sideGeo = [], sideMeas = [];
+
+  sides.forEach((s, si) => {
+    const N = s.nose, hN = h(N);
+    const ray = (through, hh) => { const v = sub(through, N), hv = dot(v, up); return hv > 0.5 ? add(N, mul(v, (hh - hN) / hv)) : through; };
+    const inward = mul(right, Math.sign(dot(sub(g, N), right)) || 1);
+    // arch line goes through pupil centre or the outer edge of the iris
+    let archThrough = s.iris;
+    if ($("archMode").value === "iris") {
+      archThrough = s.irisEdge.reduce((best, p) => dot(sub(p, s.iris), inward) < dot(sub(best, s.iris), inward) ? p : best);
+    }
+    const rays = { start: s.eyeIn, arch: archThrough, tail: s.eyeOut };
+    const top = L.top + faceH * 0.06;
+
+    if (showLines && $("lMap").checked) {
+      ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = lw; ctx.setLineDash([5 * dpr, 4 * dpr]);
+      for (const k in rays) lineS(N, ray(rays[k], top));
+      ctx.setLineDash([]);
+    }
+    if (showLines && $("lBrow").checked) {
+      ctx.strokeStyle = "rgba(255,255,255,.6)"; ctx.lineWidth = lw; ctx.beginPath();
+      [...s.up, ...[...s.lo].reverse()].map(T).forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+      ctx.closePath(); ctx.stroke();
+    }
+
+    // main points: every mapping line crosses every level line
+    if (showDots) {
+      const r = 2.2 * dpr;
+      for (const k in rays) for (const lv of ["top", "mid", "bot"]) {
+        const p = T(ray(rays[k], L[lv]));
+        ctx.fillStyle = "rgba(0,0,0,.7)"; dotS(p, r + 1 * dpr);
+        ctx.fillStyle = LEVEL_COL[lv]; dotS(p, r);
+      }
+      [N, archThrough].map(T).forEach(p => { ctx.fillStyle = "rgba(0,0,0,.7)"; dotS(p, 3.2 * dpr); ctx.fillStyle = "#fff"; dotS(p, 2.2 * dpr); });
+    }
+
+    // shape handles sit on the crossings, then move with the finger
+    const base = [
+      ray(rays.start, L.bot),                       // head bottom: red line
+      ray(rays.start, L.mid),                       // head top: yellow line
+      ray(rays.arch, L.top),                        // arch top: green line
+      ray(rays.tail, (L.mid + L.bot) / 2),          // tail end: between yellow and red
+      ray(rays.arch, L.mid)                         // arch bottom: yellow line
+    ];
+    const pts = base.map((p, i) => add(p, add(mul(inward, offsets[si][i].a * faceH), mul(up, offsets[si][i].b * faceH))));
+    sideGeo.push({ base, pts, inward });
+
+    const [HB, HT, AT, TL, AB] = pts;
+    sideMeas.push({ length: dist(lerp(HB, HT, 0.5), TL), headTh: dist(HB, HT), archTh: dist(AT, AB), head: lerp(HB, HT, 0.5) });
+
+    if (showShape) {
+      const [sHB, sHT, sAT, sTL, sAB] = pts.map(T);
+      const inS = norm(sub(T(add(g, inward)), T(g)));
+      const round = +$("sRound").value / 100;
+      const seg = (p0, m0, p1, m1) => [add(p0, mul(m0, 1 / 3)), sub(p1, mul(m1, 1 / 3))];
+      const flatTop = mul(sub(sTL, sHT), 0.5), flatBot = mul(sub(sTL, sHB), 0.5);
+      const t1 = seg(sHT, sub(sAT, sHT), sAT, flatTop);
+      const t2 = seg(sAT, flatTop, sTL, sub(sTL, sAT));
+      const b1 = seg(sHB, sub(sAB, sHB), sAB, flatBot);
+      const b2 = seg(sAB, flatBot, sTL, sub(sTL, sAB));
+      const capC = add(lerp(sHB, sHT, 0.5), mul(inS, dist(sHB, sHT) * round * 0.6));
+
+      ctx.beginPath();
+      ctx.moveTo(sHB.x, sHB.y);
+      ctx.quadraticCurveTo(capC.x, capC.y, sHT.x, sHT.y);
+      ctx.bezierCurveTo(t1[0].x, t1[0].y, t1[1].x, t1[1].y, sAT.x, sAT.y);
+      ctx.bezierCurveTo(t2[0].x, t2[0].y, t2[1].x, t2[1].y, sTL.x, sTL.y);
+      ctx.bezierCurveTo(b2[1].x, b2[1].y, b2[0].x, b2[0].y, sAB.x, sAB.y);
+      ctx.bezierCurveTo(b1[1].x, b1[1].y, b1[0].x, b1[0].y, sHB.x, sHB.y);
+      ctx.closePath();
+      if ($("sFill").checked) { ctx.fillStyle = hexA($("fillCol").value, 0.35); ctx.fill(); }
+      ctx.strokeStyle = $("shapeCol").value; ctx.lineWidth = +$("shapeW").value * dpr; ctx.stroke();
+
+      [sHB, sHT, sAT, sTL, sAB].forEach((p, i) => {
+        const active = drag && drag.type === "pt" && drag.side === si && drag.i === i;
+        ringS(p, (active ? 8 : 5) * dpr, 1.5 * dpr, active ? "#ff4fa0" : "#fff");
+      });
+    }
+  });
+
+  frame = { up, faceH, g, L, sides: sideGeo, halfW };
+
+  // measurements (mm), iris ~11.7 mm
+  const irisPx = (dist(P[IDX.irisEdgeA[0]], P[IDX.irisEdgeA[1]]) + dist(P[IDX.irisEdgeB[0]], P[IDX.irisEdgeB[1]])) / 2;
+  const mm = irisPx > 2 ? 11.7 / irisPx : 0;
+  const roll = Math.atan2(up.x, -up.y) * 180 / Math.PI;
+  const dl = Math.abs(dot(sub(P[IDX.noseTip], P[IDX.eyeOutA]), right));
+  const dr = Math.abs(dot(sub(P[IDX.noseTip], P[IDX.eyeOutB]), right));
+  meas = { mm, sides: sideMeas, gap: dist(sideMeas[0].head, sideMeas[1].head), roll, yaw: (dl - dr) / (dl + dr || 1) };
+}
+
+// ---------- info ----------
+let lastInfo = 0;
+function updateInfo(now) {
+  if (now - lastInfo < 200) return;
+  lastInfo = now;
+  const pose = $("pose"), info = $("info");
+  if (!meas) { pose.style.display = "none"; info.style.display = "none"; return; }
+  // tilt is fine, the lines follow the head. Only warn when the head is turned far to the side.
+  const yawBad = Math.abs(meas.yaw) > 0.28;
+  if (yawBad && $("poseWarn").checked) { pose.style.display = "block"; pose.className = "warn"; pose.textContent = "Erősen oldalra fordult, az egyik oldal torzulhat"; }
+  else pose.style.display = "none";
+
+  if (!showMeas || !meas.mm) { info.style.display = "none"; return; }
+  const f = v => (v * meas.mm).toFixed(1);
+  const [A, B] = meas.sides;
+  info.innerHTML =
+    `<div>Hossz: J <b>${f(A.length)}</b> / B <b>${f(B.length)}</b> mm</div>` +
+    `<div>Eleje: <b>${f(A.headTh)}</b> / <b>${f(B.headTh)}</b> mm, ív: <b>${f(A.archTh)}</b> / <b>${f(B.archTh)}</b> mm</div>` +
+    `<div>Két eleje között: <b>${f(meas.gap)}</b> mm</div>` +
+    `<div class="muted">Becsült érték</div>`;
+  info.style.display = "block";
+}
+
+// ---------- finger dragging: handles first, then level lines ----------
+let drag = null;
+const FINE = 0.6;
+function pointerPos(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height };
+}
+cv.addEventListener("pointerdown", e => {
+  if (!frame) return;
+  const p = pointerPos(e);
+  let best = 32 * dpr, hit = null;
+  if (showShape) frame.sides.forEach((sg, si) => sg.pts.forEach((q, i) => {
+    const d = dist(p, T(q)); if (d < best) { best = d; hit = { type: "pt", side: si, i }; }
+  }));
+  if (!hit && showLines && $("lLevel").checked) {
+    const pv = Tinv(p), hp = dot(sub(pv, frame.g), frame.up);
+    let bestL = 24 * dpr;
+    for (const k of ["top", "mid", "bot"]) {
+      const d = Math.abs(hp - frame.L[k]) * view.s;
+      if (d < bestL) { bestL = d; hit = { type: "lvl", k }; }
+    }
+  }
+  if (!hit) return;
+  e.preventDefault();
+  hit.finger = p;
+  hit.start = hit.type === "pt" ? { ...offsets[hit.side][hit.i] } : levelOff[hit.k];
+  drag = hit;
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", e => {
+  if (!drag || !frame) return;
+  e.preventDefault();
+  const d = mul(sub(Tinv(pointerPos(e)), Tinv(drag.finger)), FINE);
+  if (drag.type === "pt") {
+    const sg = frame.sides[drag.side];
+    const o = { a: drag.start.a + dot(d, sg.inward) / frame.faceH, b: drag.start.b + dot(d, frame.up) / frame.faceH };
+    offsets[drag.side][drag.i] = o;
+    if ($("sSym").checked) offsets[1 - drag.side][drag.i] = { ...o };
+  } else {
+    levelOff[drag.k] = drag.start + dot(d, frame.up) / frame.faceH;
+  }
+});
+const endDrag = () => { drag = null; };
+cv.addEventListener("pointerup", endDrag);
+cv.addEventListener("pointercancel", endDrag);
+
+// ---------- main loop ----------
+function loop(now) {
+  if (!frozen && vid.readyState >= 2 && landmarker) {
+    const t = performance.now();
+    if (t > lastTime) {
+      lastTime = t;
+      const res = landmarker.detectForVideo(vid, t);
+      if (res.faceLandmarks && res.faceLandmarks.length) {
+        lastPts = getPts(res.faceLandmarks[0], vid.videoWidth, vid.videoHeight);
+        status("");
+      } else {
+        smooth = null; lastPts = null; frame = null; meas = null;
+        status("Nem látom az arcot. Nézz szemből a kamerába, legyen jó fény.");
+      }
+    }
+  }
+  const src = frozen ? frozenCv : vid;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#0d0d0f"; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (frozen || vid.readyState >= 2) {
+    updateView();
+    ctx.setTransform(sx(), 0, 0, view.s, cv.width / 2 - view.cx * sx(), cv.height / 2 - view.cy * view.s);
+    ctx.drawImage(src, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (lastPts) drawOverlay(lastPts);
+  }
+  updateInfo(now || 0);
+  requestAnimationFrame(loop);
+}
+
+// ---------- buttons ----------
+const tog = (id, v) => $(id).classList.toggle("on", v);
+$("bZoom").onclick  = () => { zoomOn = !zoomOn; tog("bZoom", zoomOn); };
+$("bShape").onclick = () => { showShape = !showShape; tog("bShape", showShape); };
+$("bLines").onclick = () => { showLines = !showLines; tog("bLines", showLines); };
+$("bDots").onclick  = () => { showDots = !showDots; tog("bDots", showDots); };
+$("bMeas").onclick  = () => { showMeas = !showMeas; tog("bMeas", showMeas); lastInfo = 0; };
+$("bReset").onclick = () => { offsets = zeroOffsets(); levelOff = { top: 0, mid: 0, bot: 0 }; toast("Alaphelyzet"); };
+
+$("bFreeze").onclick = () => {
+  if (!frozen) {
+    if (!vid.videoWidth) return;
+    frozenCv.width = vid.videoWidth; frozenCv.height = vid.videoHeight;
+    frozenCv.getContext("2d").drawImage(vid, 0, 0);
+  }
+  frozen = !frozen;
+  tog("bFreeze", frozen);
+  $("bFreeze").textContent = frozen ? "Élő" : "Megállít";
+};
+
+$("bSave").onclick = () => {
+  cv.toBlob(async blob => {
+    const name = "szemoldok-" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".png";
+    const file = new File([blob], name, { type: "image/png" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
+    } catch (e) { if (e.name === "AbortError") return; }
+    const a = document.createElement("a");
+    a.download = name; a.href = URL.createObjectURL(blob); a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, "image/png");
+};
+
+$("bFlip").onclick = async () => {
+  facing = facing === "user" ? "environment" : "user";
+  mirror = facing === "user"; tog("bMirror", mirror);
+  if (frozen) $("bFreeze").click();
+  try { await startCam(); } catch (e) { status("Kamera hiba: " + e.message); }
+};
+$("bMirror").onclick = () => { mirror = !mirror; tog("bMirror", mirror); };
+$("bSet").onclick = () => {
+  const p = $("panel"), show = p.style.display !== "block";
+  p.style.display = show ? "block" : "none"; tog("bSet", show);
+};
+
+const SAVE_KEYS = ["sRound", "shapeCol", "fillCol", "shapeW", "archMode"];
+$("bStore").onclick = () => {
+  try {
+    localStorage.setItem("browStudio2", JSON.stringify({ offsets, levelOff, vals: Object.fromEntries(SAVE_KEYS.map(k => [k, $(k).value])) }));
+    toast("Forma elmentve");
+  } catch { toast("Mentés nem sikerült"); }
+};
+$("bLoad").onclick = () => {
+  try {
+    const d = JSON.parse(localStorage.getItem("browStudio2") || "null");
+    if (!d) { toast("Nincs mentett forma"); return; }
+    offsets = d.offsets; levelOff = d.levelOff;
+    Object.entries(d.vals).forEach(([k, v]) => $(k).value = v);
+    toast("Mentett forma betöltve");
+  } catch { toast("Betöltés nem sikerült"); }
+};
+</script>
+</body>
+</html>
